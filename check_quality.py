@@ -15,7 +15,7 @@ def check_quality(mwrpfile, start_time):
     qv = ds.waterVaporMixingRatio.values
     qv_q = ds.qc_waterVaporMixingRatio.values
     temp = ds.temperature.values
-    
+    height = ds.height.values
     start_i = (np.abs(time-start_time)).argmin()
     end_t = start_time - 3600 # up to an hour prior
     end_i = (np.abs(time-end_t)).argmin()
@@ -28,13 +28,17 @@ def check_quality(mwrpfile, start_time):
     quality_time = 0.  
     t = start_i
     x = np.where(dqf != 0.)
-    nx = len(x)
+    nx = len(x[0])
     y = np.where(q_fix <= 0)
-    ny = len(y)
+    ny = len(y[0])
+
     if (wet_wind2 == 1) or (nx != 0):
-        t_fix = np.nan
-        q_fix = np.nan
-  # check wet windows and data quality flags in prior times - up to an hour - make note of this lag
+        
+        t_fix = height.copy()
+        t_fix[:] = np.nan
+        q_fix = height.copy()
+        q_fix[:] = np.nan
+   # check wet windows and data quality flags in prior times - up to an hour - make note of this lag
         while ((wet_wind2 != 0) or (nx != 0) or (ny != 0)) and (t <= end_i):
             t=t-1  
             wet_wind2 = wet_wind[t] 

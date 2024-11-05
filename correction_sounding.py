@@ -17,15 +17,15 @@ from rescaleq_to_pwv import rescaleq_to_pwv
 from qvsat import qvsat
 
 def correction_sounding(vyear,vmonth,vday, oheightm, time_s, time_c, rhsonde, psonde, tsonde):
-
 # convert sounding RH to qv
-    qsonde = []
-    for h in range(0, len(tsonde)-1):
+    qsonde = psonde.copy()
+    qsonde[:] = np.nan
+    for h in range(0, len(tsonde)):
         qvsonde = qvsat(tsonde[h],psonde[h])
         qvsonde = qvsonde * 1000.
         oq = (rhsonde[h]/100) * qvsonde
-        qsonde = [qsonde, oq]
-      
+        qsonde[h] = oq
+    
     bad_mwrp = 0
     bad_pwv = 0
     real_time_dif = 0
@@ -36,7 +36,7 @@ def correction_sounding(vyear,vmonth,vday, oheightm, time_s, time_c, rhsonde, ps
     heights_c = ds.height.values
 
     
-# do quality checks of mwrp profile at time of cloud and sounding
+# do quality checks of mwrp profile at time of cloud and sounding and search up to an hour before for good profile
     temp_c,q_c,quality_time_c = check_quality(file_string, time_c)
     temp_s,q_s,quality_time_s = check_quality(file_string, time_s)
     if quality_time_c != 0: 
@@ -46,19 +46,28 @@ def correction_sounding(vyear,vmonth,vday, oheightm, time_s, time_c, rhsonde, ps
     if quality_time_c != 0 and quality_time_s != 0: 
         real_time_dif = 3 
 
-    #print(q_c)
 
-    t_corrected = tsonde
-    q_new_corrected = qsonde
+    t_corrected = tsonde.copy()
+    q_new_corrected = qsonde.copy()
 
-    x = np.where(q_c <= 0. or q_s <= 0.)
-    nx = len(x)
-    y = np.where(temp_c <= -9990. or temp_s <= -9990.)
-    ny = len(y)
-
-    if nx > 0. or ny > 0.:
+    x = np.where(q_c <= 0.) 
+    xx = np.where(q_s <= 0.)
+    nx = len(x[0])
+    nxx = len(xx[0])
+    y = np.where(temp_c <= -9990.)
+    yy = np.where(temp_s <= -9990.)
+    ny = len(y[0])
+    nyy = len(yy[0])
+   
+    if nx > 0 or nxx > 0 or ny > 0 or nyy > 0 :
         bad_mwrp = 1
+        print('bad mwrp')
         return([t_corrected, q_new_corrected, bad_mwrp, bad_pwv, real_time_dif])
+    
+    q_c[x] = np.nan
+    q_s[x] = np.nan
+    temp_c[y] = np.nan
+    temp_s[y] = np.nan
         
 # get deltas between time of cloud and sounding 
     temp_dif = temp_c - temp_s
@@ -69,27 +78,31 @@ def correction_sounding(vyear,vmonth,vday, oheightm, time_s, time_c, rhsonde, ps
     w_correct_new = np.zeros(len(oheightm))
     w_correct_new[:] = 0.
     for h in range(0, len(heights_c)-1): 
-        x = np.where((oheightm >= heights_c[h]) and (oheightm < heights_c[h+1]))
+        x = np.where((oheightm >= heights_c[h]) & (oheightm < heights_c[h+1]))
         temp_correct_new[x] = temp_dif[h]
         w_correct_new[x] = q_dif[h]
-
+    
 # no corrections above 10 km
     y = np.where(oheightm > 10000.)
     temp_correct_new[y] = 0. 
     w_correct_new[y] = 0. 
 
 # add correction to sounding values
-    x = np.where((tsonde > -99.) and (qsonde > -99.) and (psonde > -99.))
+    print(tsonde)
+    print(qsonde)
+    print(psonde)
+    x = np.where((tsonde > -99.) & (qsonde > -99.) & (psonde > -99.))
     t_corrected = tsonde[x] + temp_correct_new[x]
     q_corrected = (qsonde[x] + w_correct_new[x])/1000.
     psonde = psonde[x]
+    print(q_corrected)
 #plot, tsonde, oheightm
 #oplot, t_corrected, oheightm
 
 #***************Constrain Q correct to PWV***************
     q_new_corrected = rescaleq_to_pwv(vyear, vmonth, vday, time_c, q_corrected, psonde, oheightm[x])	
     q_new_corrected = q_new_corrected*1000
-
+    print('new q', q_new_corrected)
 
     if q_new_corrected[0] < 0.:
         q_new_corrected=q_corrected*1000

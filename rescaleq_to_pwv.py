@@ -6,7 +6,7 @@ from pwv_goffgratch_q import pwv_goffgratch_q
 def rescaleq_to_pwv(vyear, vmonth, vday,time_c, qsonde, psonde, heights):
 
 #******** IMPORT MWRRET DATA
-    file_string = 'maomwrret1liljclouM1.c2.'+vyear+vmonth+vday+'*.cdf'
+    file_string = 'maomwrret1liljclouM1.c2.'+vyear+vmonth+vday+'.000000.cdf'
     ds = xr.open_dataset(file_string,decode_times=False)
 
     time_m = ds.time.values # obs about once every 24 seconds
@@ -28,7 +28,7 @@ def rescaleq_to_pwv(vyear, vmonth, vday,time_c, qsonde, psonde, heights):
 
     q2 = -9999.
     pwv_new = -9999.
-    q_new = np.zeros(len(qsonde))
+    q_new = qsonde.copy()
     q_new[:] = 0.
 
     y = np.where(heights > 10000)
@@ -41,7 +41,7 @@ def rescaleq_to_pwv(vyear, vmonth, vday,time_c, qsonde, psonde, heights):
     if pwv_sonde < pwv_mwrret:
         while pwv_new < pwv_mwrret:
             q2[:] = q2[:] + 0.00001
-            q2[:] = qsonde[y]
+            q2[y] = qsonde[y]
             x = np.where(q2 < 0.)
             q2[x] = 0.
             pwv_new = pwv_goffgratch_q(q2, psonde)
